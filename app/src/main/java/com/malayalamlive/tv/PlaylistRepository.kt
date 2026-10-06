@@ -11,22 +11,16 @@ import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-data class PlaylistSource(val url: String, val defaultLanguage: String? = null)
-
 /**
- * Downloads every configured M3U playlist, caches each one on disk so the app still opens
- * when a source is down, and merges them into one de-duplicated channel list.
+ * Downloads every enabled playlist, caches each one on disk so the app still opens when a
+ * source is down, and merges them into one de-duplicated channel list.
  */
 class PlaylistRepository(private val context: Context) {
 
-    companion object {
-        /** Public, community-maintained lists of free-to-air streams (github.com/iptv-org/iptv). */
-        val DEFAULT_SOURCES = listOf(
-            PlaylistSource("https://iptv-org.github.io/iptv/languages/mal.m3u", "Malayalam"),
-            PlaylistSource("https://iptv-org.github.io/iptv/countries/in.m3u"),
-        )
-        private const val PREFS = "playlists"
-        private const val KEY_CUSTOM = "custom_urls"
+    private companion object {
+        const val PREFS = "playlists"
+        const val KEY_CUSTOM = "custom_urls"
+        const val KEY_ENABLED = "enabled_sources"
     }
 
     data class Result(val channels: List<Channel>, val failedSources: List<String>)
@@ -48,29 +42,32 @@ class PlaylistRepository(private val context: Context) {
         cacheFile(url).delete()
     }
 
-    fun sources(): List<PlaylistSource> = DEFAULT_SOURCES + customUrls().map { PlaylistSource(it) }
+    fun enabledSourceIds(): Set<String> =
+        prefs.getStringSet(KEY_ENABLED, null)?.toSet()
+            ?: Sources.BUILT_IN.filter { it.enabledByDefault }.mapTo(HashSet()) { it.id }
+
+    fun setEnabledSourceIds(ids: Set<String>) {
+        prefs.edit().putStringSet(KEY_ENABLED, ids).apply()
+    }
+
+    private fun sources(): List<PlaylistSource> {
+        val enabled = enabledSourceIds()
+        return Sources.BUILT_IN.filter { it.id in enabled } +
+            customUrls().map { PlaylistSource(it, it, it) }
+    }
 
     suspend fun load(forceRefresh: Boolean): Result = coroutineScope {
         val results = sources().map { source ->
             async(Dispatchers.IO) { source to fetch(source.url, forceRefresh) }
         }.awaitAll()
 
-        val failed = results.filter { it.second == null }.map { it.first.url }
-        val merged = LinkedHashMap<String, Channel>()
-        for ((source, text) in results) {
-            if (text == null) continue
-            for (channel in M3uParser.parse(text, source.defaultLanguage)) {
-                val existing = merged[channel.url]
-                // The same stream often appears in both the language and the country list;
-                // keep one entry but remember every language/group it was listed under.
-                merged[channel.url] = if (existing == null) channel else existing.copy(
-                    logo = existing.logo ?: channel.logo,
-                    groups = (existing.groups + channel.groups).distinct(),
-                    languages = (existing.languages + channel.languages).distinct(),
-                )
-            }
+        val failed = results.filter { it.second == null }.map { it.first.title }
+        val channels = withContext(Dispatchers.Default) {
+            ChannelMerger.merge(
+                results.mapNotNull { (source, text) -> text?.let { M3uParser.parse(it, source.defaultLanguage) } },
+            )
         }
-        Result(Categories.sort(merged.values.toList()), failed)
+        Result(channels, failed)
     }
 
     private suspend fun fetch(url: String, forceRefresh: Boolean): String? = withContext(Dispatchers.IO) {

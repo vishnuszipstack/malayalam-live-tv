@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#FF0E1116</color>
-    <color name="surface">#FF1A1F27</color>
-    <color name="accent">#FF1FA35C</color>
-    <color name="accent_dim">#661FA35C</color>
-    <color name="text_primary">#FFF2F4F7</color>
-    <color name="text_secondary">#FFA3ABB8</color>
-    <color name="scrim">#CC000000</color>
+    <color name="background">#FF0B0F14</color>
+    <color name="sidebar">#FF10151C</color>
+    <color name="surface">#FF181E27</color>
+    <color name="surface_high">#FF232B37</color>
+    <color name="logo_plate">#FF2B3442</color>
+    <color name="accent">#FF22C55E</color>
+    <color name="accent_soft">#3322C55E</color>
+    <color name="live">#FFE11D48</color>
+    <color name="gold">#FFFBBF24</color>
+    <color name="text_primary">#FFF3F5F8</color>
+    <color name="text_secondary">#FF9AA4B2</color>
+    <color name="text_on_accent">#FF04120A</color>
+    <color name="panel">#F20B0F14</color>
 </resources>

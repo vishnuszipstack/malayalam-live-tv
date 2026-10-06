@@ -12,12 +12,14 @@ class M3uParserTest {
         #EXTM3U x-tvg-url="https://example.com/epg.xml"
         #EXTINF:-1 tvg-id="AsianetNews.in" tvg-logo="https://example.com/asianet.png" group-title="News",Asianet News (720p)
         https://example.com/asianet/index.m3u8
-        #EXTINF:-1 tvg-id="Kairali.in" tvg-language="Malayalam" group-title="Entertainment;General",Kairali TV
+        #EXTINF:-1 tvg-id="Kairali.in" tvg-language="Malayalam" group-title="Entertainment;General",Kairali TV (576p) [Not 24/7]
         #EXTVLCOPT:http-user-agent=Mozilla/5.0 TestAgent
         #EXTVLCOPT:http-referrer=https://kairali.example/
         http://example.com/kairali.m3u8
-        #EXTINF:-1 tvg-id="DDNational.in" group-title="Undefined",DD National
-        https://example.com/dd.m3u8
+        #EXTINF:-1 tvg-id="DDNational.in" group-title="Undefined",DD National Ⓨ
+        https://www.youtube.com/doordarshan/live
+        #EXTINF:-1,Zee News (1080p) [Geo-blocked]
+        https://example.com/zee.m3u8
 
         #EXTINF:-1,Broken entry with no URL
         #EXTINF:-1 tvg-name="Name From Attr",
@@ -25,12 +27,17 @@ class M3uParserTest {
     """.trimIndent()
 
     @Test
-    fun parsesNamesUrlsAndLogos() {
+    fun cleansNamesAndKeepsQualityAndTags() {
         val channels = M3uParser.parse(sample)
-        assertEquals(listOf("Asianet News (720p)", "Kairali TV", "DD National", "Name From Attr"), channels.map { it.name })
-        assertEquals("https://example.com/asianet/index.m3u8", channels[0].url)
+        assertEquals(
+            listOf("Asianet News", "Kairali TV", "DD National", "Zee News", "Name From Attr"),
+            channels.map { it.name },
+        )
+        assertEquals(720, channels[0].streams.single().quality)
+        assertTrue(channels[1].streams.single().notAlways)
+        assertTrue(channels[3].geoBlocked)
+        assertFalse(channels[0].geoBlocked)
         assertEquals("https://example.com/asianet.png", channels[0].logo)
-        assertNull(channels[1].logo)
     }
 
     @Test
@@ -43,31 +50,35 @@ class M3uParserTest {
     @Test
     fun readsVlcOptionsOnlyForTheirOwnEntry() {
         val channels = M3uParser.parse(sample)
-        assertEquals("Mozilla/5.0 TestAgent", channels[1].userAgent)
-        assertEquals("https://kairali.example/", channels[1].referrer)
-        assertNull(channels[2].userAgent)
+        assertEquals("Mozilla/5.0 TestAgent", channels[1].streams.single().userAgent)
+        assertEquals("https://kairali.example/", channels[1].streams.single().referrer)
+        assertNull(channels[2].streams.single().userAgent)
     }
 
     @Test
-    fun detectsMalayalamFromAttributeOrSourceDefault() {
+    fun detectsYouTubeOnlyChannels() {
+        val channels = M3uParser.parse(sample)
+        assertTrue(channels[2].isYouTube)
+        assertFalse(channels[0].isYouTube)
+    }
+
+    @Test
+    fun detectsMalayalamFromAttributeSourceOrKnownName() {
         val plain = M3uParser.parse(sample)
-        assertTrue(plain[1].isMalayalam)
-        assertFalse(plain[0].isMalayalam)
+        assertTrue(plain[0].isMalayalam) // "Asianet News" is a known Malayalam channel
+        assertTrue(plain[1].isMalayalam) // tvg-language
+        assertFalse(plain[3].isMalayalam)
 
         val fromMalayalamList = M3uParser.parse(sample, defaultLanguage = "Malayalam")
-        assertTrue(fromMalayalamList[0].isMalayalam)
+        assertTrue(fromMalayalamList[3].isMalayalam)
     }
 
     @Test
-    fun categoriesPutMalayalamFirstAndSortMalayalamChannelsToTop() {
-        val channels = Categories.sort(M3uParser.parse(sample))
-        assertEquals("Kairali TV", channels.first().name)
-
-        val categories = Categories.build(channels, favorites = setOf(channels.last().url))
-        assertEquals(Categories.MALAYALAM, categories[0])
-        assertEquals(Categories.FAVORITES, categories[1])
-        assertEquals(Categories.ALL, categories.last())
-        assertEquals(1, Categories.filter(Categories.FAVORITES, channels, setOf(channels.last().url)).size)
-        assertEquals(2, Categories.filter("News", channels + channels[1].copy(url = "x", groups = listOf("News")), emptySet()).size)
+    fun knownNamesDoNotCatchOtherLanguageSisterChannels() {
+        assertTrue(MalayalamChannels.matches(Channel.normalize("Kappa TV")))
+        assertTrue(MalayalamChannels.matches(Channel.normalize("Raj News Malayalam")))
+        assertTrue(MalayalamChannels.matches(Channel.normalize("Harvest TV Keralam")))
+        assertFalse(MalayalamChannels.matches(Channel.normalize("Asianet Suvarna News")))
+        assertFalse(MalayalamChannels.matches(Channel.normalize("Asianet News Telugu")))
     }
 }

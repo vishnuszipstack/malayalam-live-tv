@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Malayalam Live TV</string>
+    <string name="brand_top">Malayalam Live</string>
+    <string name="brand_bottom">TV</string>
     <string name="loading">Loading channels…</string>
     <string name="channel_count">%1$d channels</string>
-    <string name="sources_failed">%1$d playlist(s) could not be downloaded; using cached copy if available.</string>
-    <string name="refresh">Refresh</string>
-    <string name="playlists">Playlists</string>
+    <plurals name="channels">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
+    <string name="sources_failed">Could not download: %1$s. Using the saved copy if there is one.</string>
+    <string name="refresh">Refresh channels</string>
+    <string name="channel_sources">Channel sources</string>
+    <string name="my_playlists">My playlists</string>
     <string name="add_playlist">Add playlist URL…</string>
     <string name="add_playlist_hint">Paste the M3U / M3U8 playlist link from your IPTV provider.</string>
     <string name="remove_playlist">Remove %1$s</string>
     <string name="invalid_url">Enter a link starting with http:// or https://</string>
     <string name="favorite_added">Added %1$s to favourites</string>
     <string name="favorite_removed">Removed %1$s from favourites</string>
-    <string name="empty">No channels loaded. Check the internet connection, then press Refresh.</string>
-    <string name="channel_position">%1$d / %2$d · %3$s</string>
+    <string name="empty">No channels loaded. Check the internet connection, then choose Refresh channels.</string>
+    <string name="empty_category">No channels here yet.</string>
+    <string name="hint">OK  Play     ·     Hold OK  Add to favourites     ·     ◀ or Back  Categories</string>
+    <string name="sources_count">%1$d sources</string>
+    <string name="india_only">Region locked</string>
+    <string name="youtube_missing">This channel streams on YouTube. Install the YouTube app to watch it.</string>
+    <string name="live">LIVE</string>
+    <string name="source_of">Source %1$d of %2$d</string>
     <string name="channel_unavailable">This channel is not available right now (%1$s). Press ▲ / ▼ for another channel.</string>
-    <string name="hint">OK: play · Hold OK: favourite · In player ▲▼: change channel</string>
+    <string name="picture_changed">Picture: %1$s</string>
+    <string name="picture_stretch">Full screen</string>
+    <string name="picture_original">Original shape</string>
+    <string name="picture_zoom">Zoom</string>
+    <string name="player_hints">▲▼  Channel\n◀  Channel list\n▶  Picture: %1$s\n☰  Favourite</string>
 </resources>

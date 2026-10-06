@@ -5,15 +5,33 @@ shows **Malayalam channels first**, and plays HLS/DASH streams full-screen with 
 
 ## What's in it
 
-- **Built-in sources:** the public [iptv-org](https://github.com/iptv-org/iptv) lists of
-  free-to-air streams: Malayalam-language (`languages/mal.m3u`) and India (`countries/in.m3u`).
-- **Your own playlists:** *Playlists → Add playlist URL* takes any M3U link, for example
-  from an IPTV subscription you pay for.
-- Categories: Malayalam, Favourites, every playlist group (News, Movies, Music…), and All.
-- Remote-friendly: D-pad navigation, **▲/▼ changes channel** in the player, **hold OK** on a
-  tile (or **Menu** in the player) to add a favourite.
+- **Malayalam first:** the Malayalam category opens by default. Channels are recognised as
+  Malayalam from the Malayalam playlist, from `tvg-language`, or from a list of known Kerala
+  channel names, so the ones the India playlists list without a language still show up.
+- **Sources** (sidebar → *Channel sources*): the public [iptv-org](https://github.com/iptv-org/iptv)
+  Malayalam and India lists plus the [Free-TV](https://github.com/Free-TV/IPTV) India list are on
+  by default; Tamil, Hindi, Telugu, Kannada, world news, movies, kids and music can be switched on.
+- **Your own playlists:** sidebar → *My playlists* takes any M3U link, for example from an IPTV
+  subscription you pay for.
+- **Backup streams:** the same channel from several lists or qualities is merged into one tile.
+  If a stream fails, the player moves to the next one automatically.
+- **Categories:** Malayalam, Recently watched, Favourites, languages, playlist groups and All.
 - Playlists are cached for 6 hours, so the app still opens if a source is down.
 - Per-stream `User-Agent`/`Referer` (`#EXTVLCOPT`) is honoured, which some broadcasters need.
+- Channels that only stream on YouTube open in the YouTube app.
+
+## Remote control
+
+| Where | Button | Action |
+|---|---|---|
+| Channel grid | OK | Play |
+| | Hold OK | Add / remove favourite |
+| | ◀ (from the first column) or Back | Categories |
+| Player | ▲ / ▼ | Previous / next channel |
+| | ◀ or OK | Channel list |
+| | ▶ | Picture size: Full screen / Original shape / Zoom (remembered per channel) |
+| | ☰ Menu | Add / remove favourite |
+| | Play/Pause | Pause / resume |
 
 ## Build the APK
 

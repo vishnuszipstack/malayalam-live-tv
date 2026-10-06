@@ -1,13 +1,17 @@
 package com.malayalamlive.tv
 
 /**
- * Parses extended M3U playlists (the format used by iptv-org and most IPTV providers).
+ * Parses extended M3U playlists (the format used by iptv-org, Free-TV and most IPTV providers).
  *
- * Supported tags: `#EXTINF` attributes `tvg-logo`, `group-title`, `tvg-language`, plus the
- * VLC per-stream options `#EXTVLCOPT:http-user-agent` / `http-referrer`.
+ * Supported: `#EXTINF` attributes `tvg-logo`, `group-title`, `tvg-language`, and the VLC
+ * per-stream options `#EXTVLCOPT:http-user-agent` / `http-referrer`. Names are cleaned of the
+ * "(720p)", "[Geo-blocked]" and "Ⓨ" decorations, which are kept as structured fields instead.
  */
 object M3uParser {
     private val attrRegex = Regex("""([\w-]+)="([^"]*)"""")
+    private val qualityRegex = Regex("""\((\d{3,4})p\)""")
+    private val tagRegex = Regex("""\[([^\]]*)\]""")
+    private val spaces = Regex("""\s+""")
 
     fun parse(text: String, defaultLanguage: String? = null): List<Channel> {
         val channels = mutableListOf<Channel>()
@@ -57,19 +61,29 @@ object M3uParser {
         defaultLanguage: String?,
     ): Channel {
         val attrs = attrRegex.findAll(inf).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
-        val name = inf.replace(attrRegex, "").substringAfter(',', "").trim()
+        val rawName = inf.replace(attrRegex, "").substringAfter(',', "").trim()
             .ifEmpty { attrs["tvg-name"].orEmpty() }
+        val quality = qualityRegex.find(rawName)?.groupValues?.get(1)?.toIntOrNull()
+        val tags = tagRegex.findAll(rawName).map { it.groupValues[1].trim().lowercase() }.toList()
+        val name = rawName.replace(qualityRegex, "").replace(tagRegex, "").replace("Ⓨ", "")
+            .replace(spaces, " ").trim()
             .ifEmpty { url }
-        val languages = splitList(attrs["tvg-language"])
-            .ifEmpty { listOfNotNull(defaultLanguage) }
+
         return Channel(
             name = name,
-            url = url,
+            streams = listOf(
+                Stream(
+                    url = url,
+                    userAgent = userAgent ?: attrs["http-user-agent"]?.takeIf { it.isNotBlank() },
+                    referrer = referrer ?: attrs["http-referrer"]?.takeIf { it.isNotBlank() },
+                    quality = quality,
+                    notAlways = "not 24/7" in tags,
+                ),
+            ),
             logo = attrs["tvg-logo"]?.takeIf { it.isNotBlank() },
             groups = splitList(attrs["group-title"]),
-            languages = languages,
-            userAgent = userAgent ?: attrs["http-user-agent"]?.takeIf { it.isNotBlank() },
-            referrer = referrer ?: attrs["http-referrer"]?.takeIf { it.isNotBlank() },
+            languages = splitList(attrs["tvg-language"]).ifEmpty { listOfNotNull(defaultLanguage) },
+            geoBlocked = "geo-blocked" in tags,
         )
     }
 
