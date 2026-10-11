@@ -58,8 +58,11 @@ jobs:
       - name: Verify APK
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs MalayalamLiveTV.apk | grep -E "^(Verifies|Signer #1 certificate (DN|SHA-256))"
-          "$BT/aapt2" dump badging MalayalamLiveTV.apk | grep -E "^(package|minSdkVersion|targetSdkVersion)"
+          # apksigner exits non-zero on an invalid signature; the greps only trim the output.
+          "$BT/apksigner" verify --verbose --print-certs MalayalamLiveTV.apk > verify.txt
+          grep -E "^Verif|certificate (DN|SHA-256)" verify.txt || true
+          "$BT/aapt2" dump badging MalayalamLiveTV.apk > badging.txt
+          grep -E "^(package|.*[sS]dkVersion)" badging.txt || true
           ls -l MalayalamLiveTV.apk
       - uses: actions/upload-artifact@v4
         with:
