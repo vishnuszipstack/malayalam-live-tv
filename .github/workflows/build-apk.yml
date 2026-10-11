@@ -23,6 +23,12 @@ jobs:
         run: |
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk MalayalamLiveTV.apk
+      - name: Verify APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --verbose --print-certs MalayalamLiveTV.apk
+          "$BT/aapt2" dump badging MalayalamLiveTV.apk | grep -E "^(package|sdkVersion|targetSdkVersion|uses-feature|leanback-launchable|launchable)"
+          ls -l MalayalamLiveTV.apk && sha256sum MalayalamLiveTV.apk
       - uses: actions/upload-artifact@v4
         with:
           name: MalayalamLiveTV-apk
