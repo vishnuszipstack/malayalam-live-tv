@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
 
+# The first signed run commits the signing key; never let two runs race to create it.
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,30 +22,57 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+
+      # Updates only install over the old app when every release is signed with the same key.
+      # The key is created once, as a PKCS12 keystore encrypted with the SIGNING_PASSWORD
+      # repository secret, and committed; without the secret the file is useless.
+      - name: Signing key
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::warning::Add the SIGNING_PASSWORD repository secret to sign and publish releases."
+            exit 0
+          fi
+          if [ ! -f signing/release.p12 ]; then
+            mkdir -p signing
+            keytool -genkeypair -storetype PKCS12 -keystore signing/release.p12 -alias release \
+              -keyalg RSA -keysize 3072 -validity 36500 -dname "CN=Malayalam Live TV" \
+              -storepass "$SIGNING_PASSWORD" -keypass "$SIGNING_PASSWORD"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add signing/release.p12
+            git commit -m "Add release signing key (encrypted with the SIGNING_PASSWORD secret)"
+            git push
+          fi
+          echo "SIGNING_KEYSTORE=$PWD/signing/release.p12" >> "$GITHUB_ENV"
+
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
       - name: Build APK
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk MalayalamLiveTV.apk
       - name: Verify APK
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --verbose --print-certs MalayalamLiveTV.apk
-          "$BT/aapt2" dump badging MalayalamLiveTV.apk | grep -E "^(package|sdkVersion|targetSdkVersion|uses-feature|leanback-launchable|launchable)"
-          ls -l MalayalamLiveTV.apk && sha256sum MalayalamLiveTV.apk
+          "$BT/apksigner" verify --print-certs MalayalamLiveTV.apk | grep -E "^(Verifies|Signer #1 certificate (DN|SHA-256))"
+          "$BT/aapt2" dump badging MalayalamLiveTV.apk | grep -E "^(package|minSdkVersion|targetSdkVersion)"
+          ls -l MalayalamLiveTV.apk
       - uses: actions/upload-artifact@v4
         with:
           name: MalayalamLiveTV-apk
           path: MalayalamLiveTV.apk
-      # Publishes the plain .apk (no zip) as the latest release, so it can be opened
-      # straight from the phone or TV:
+      # Only builds signed with the fixed key are published, so the in-app updater
+      # never offers an APK that cannot install over the current one.
       # https://github.com/<owner>/<repo>/releases/latest/download/MalayalamLiveTV.apk
       - name: Publish release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.SIGNING_KEYSTORE != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.1.${GITHUB_RUN_NUMBER}" MalayalamLiveTV.apk \
-            --title "Malayalam Live TV 1.1.${GITHUB_RUN_NUMBER}" \
+          gh release create "v1.2.${GITHUB_RUN_NUMBER}" MalayalamLiveTV.apk \
+            --title "Malayalam Live TV 1.2.${GITHUB_RUN_NUMBER}" \
             --notes "Built from ${GITHUB_SHA::7}." --latest

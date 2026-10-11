@@ -10,6 +10,9 @@ import android.text.InputType
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
@@ -26,11 +29,14 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_REFRESH = "action:refresh"
         const val ACTION_SOURCES = "action:sources"
         const val ACTION_PLAYLISTS = "action:playlists"
+        const val ACTION_UPDATE = "action:update"
         const val CATEGORY_DELAY_MS = 180L
     }
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: PlaylistRepository
+    private lateinit var updater: Updater
+    private var update: ReleaseInfo? = null
     private var allChannels: List<Channel> = emptyList()
     private var currentCategory: String = Categories.MALAYALAM
     private var pendingCategory: String? = null
@@ -61,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         repository = PlaylistRepository(this)
+        updater = Updater(this)
 
         binding.sidebar.adapter = sidebarAdapter
         binding.sidebar.setOnChildViewHolderSelectedListener(object : OnChildViewHolderSelectedListener() {
@@ -98,6 +105,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         load(forceRefresh = false)
+        checkForUpdate(userAsked = false)
     }
 
     override fun onDestroy() {
@@ -162,6 +170,12 @@ class MainActivity : AppCompatActivity() {
             SidebarItem(ACTION_REFRESH, getString(R.string.refresh), isAction = true),
             SidebarItem(ACTION_SOURCES, getString(R.string.channel_sources), isAction = true),
             SidebarItem(ACTION_PLAYLISTS, getString(R.string.my_playlists), isAction = true),
+            SidebarItem(
+                ACTION_UPDATE,
+                update?.let { getString(R.string.update_to, it.versionName) }
+                    ?: getString(R.string.check_updates, updater.currentVersionName),
+                isAction = true,
+            ),
         )
         if (items != sidebarAdapter.items) {
             val hadFocus = binding.sidebar.hasFocus()
@@ -197,6 +211,7 @@ class MainActivity : AppCompatActivity() {
             ACTION_REFRESH -> load(forceRefresh = true)
             ACTION_SOURCES -> showSourcesDialog()
             ACTION_PLAYLISTS -> showPlaylistsDialog()
+            ACTION_UPDATE -> update?.let { startUpdate(it) } ?: checkForUpdate(userAsked = true)
             else -> {
                 handler.removeCallbacks(applyPending)
                 pendingCategory = null
@@ -300,6 +315,76 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun checkForUpdate(userAsked: Boolean) {
+        lifecycleScope.launch {
+            val found = updater.availableUpdate()
+            update = found
+            if (allChannels.isNotEmpty()) refreshSidebar()
+            when {
+                found != null -> showUpdateDialog(found)
+                userAsked -> Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.up_to_date, updater.currentVersionName),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    private fun showUpdateDialog(release: ReleaseInfo) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_available)
+            .setMessage(getString(R.string.update_message, release.versionName, updater.currentVersionName))
+            .setPositiveButton(R.string.update_now) { _, _ -> startUpdate(release) }
+            .setNegativeButton(R.string.later, null)
+            .show()
+    }
+
+    private fun startUpdate(release: ReleaseInfo) {
+        if (!updater.canInstall()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.allow_install_title)
+                .setMessage(R.string.allow_install_message)
+                .setPositiveButton(R.string.open_settings) { _, _ ->
+                    if (!updater.openInstallPermissionSettings(this)) {
+                        Toast.makeText(this, R.string.allow_install_manual, Toast.LENGTH_LONG).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
+        val label = TextView(this).apply { text = getString(R.string.downloading, 0) }
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, 0)
+            addView(label)
+            addView(progress)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.update_to, release.versionName))
+            .setView(content)
+            .setCancelable(false)
+            .show()
+
+        lifecycleScope.launch {
+            try {
+                val apk = updater.download(release) { percent ->
+                    progress.progress = percent
+                    label.text = getString(R.string.downloading, percent)
+                }
+                dialog.dismiss()
+                updater.install(this@MainActivity, apk)
+            } catch (e: Exception) {
+                dialog.dismiss()
+                Toast.makeText(this@MainActivity, getString(R.string.update_failed, e.message), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun isInside(view: View, parent: View): Boolean {

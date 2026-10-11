@@ -33,4 +33,17 @@
     <string name="picture_original">Original shape</string>
     <string name="picture_zoom">Zoom</string>
     <string name="player_hints">▲▼  Channel\n◀  Channel list\n▶  Picture: %1$s\n☰  Favourite</string>
+    <string name="check_updates">Check for updates (v%1$s)</string>
+    <string name="update_to">Update to v%1$s</string>
+    <string name="up_to_date">You have the latest version (v%1$s).</string>
+    <string name="update_available">Update available</string>
+    <string name="update_message">Version %1$s is ready to install. You have %2$s.</string>
+    <string name="update_now">Update now</string>
+    <string name="later">Later</string>
+    <string name="downloading">Downloading… %1$d%%</string>
+    <string name="update_failed">Update failed: %1$s</string>
+    <string name="allow_install_title">Allow updates</string>
+    <string name="allow_install_message">To install updates, turn on "Install unknown apps" for Malayalam Live TV, then choose the update again.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="allow_install_manual">Go to Settings → My Fire TV → Developer options → Install unknown apps and turn on Malayalam Live TV.</string>
 </resources>

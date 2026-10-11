@@ -47,6 +47,16 @@ Or build locally with Android Studio / the Android SDK installed:
 
 The release build is signed with the debug key so it can be side-loaded without a keystore.
 
+## Updates
+
+The app checks GitHub for a newer release each time it starts and offers to install it; the
+sidebar also has *Check for updates*. The first time, Fire TV asks you to allow "Install unknown
+apps" for Malayalam Live TV.
+
+Releases are signed with `signing/release.p12`, which the build creates once and encrypts with the
+`SIGNING_PASSWORD` repository secret. Without that secret the build still runs but publishes
+nothing, so every published APK can install over the previous one.
+
 ## Install on the Fire TV Stick
 
 1. On the Fire TV: **Settings → My Fire TV → Developer options**. On newer devices, first

@@ -15,14 +15,28 @@ android {
         // CI passes its run number so every build is a newer version than the last.
         val build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionCode = build
-        versionName = "1.1.$build"
+        versionName = "1.2.$build"
+    }
+
+    // CI provides a fixed key (see .github/workflows/build-apk.yml). Every release must be signed
+    // with the same key, or Android refuses to install it as an update.
+    val keystore = System.getenv("SIGNING_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("SIGNING_PASSWORD")
+                keyAlias = "release"
+                keyPassword = System.getenv("SIGNING_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the APK can be side-loaded without a keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            // Local builds without the CI key fall back to the debug key.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
@@ -35,6 +49,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 
