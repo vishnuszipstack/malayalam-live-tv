@@ -35,8 +35,9 @@ shows **Malayalam channels first**, and plays HLS/DASH streams full-screen with 
 
 ## Build the APK
 
-Push this repo to GitHub. The **Build APK** workflow runs the tests and uploads
-`MalayalamLiveTV-apk` as an artifact (Actions → latest run → Artifacts).
+Every push to `main` runs the tests, builds the APK and publishes it as the latest
+[release](../../releases/latest). The plain APK is always at
+`releases/latest/download/MalayalamLiveTV.apk` (no zip to extract).
 
 Or build locally with Android Studio / the Android SDK installed:
 
