@@ -6,8 +6,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognizerIntent
 import android.text.InputType
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.view.ViewTreeObserver
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -15,8 +19,10 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doAfterTextChanged
 import androidx.leanback.widget.OnChildViewHolderSelectedListener
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
@@ -33,6 +39,8 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_UPDATE = "action:update"
         const val ACTION_HIDDEN = "action:hidden"
         const val CATEGORY_DELAY_MS = 180L
+        const val SEARCH = "Search"
+        const val SEARCH_DELAY_MS = 250L
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -63,7 +71,26 @@ class MainActivity : AppCompatActivity() {
     )
 
     private val isHome get() = currentCategory == Dashboard.HOME
-    private val content: View get() = if (isHome) binding.home else binding.channels
+    private val isSearch get() = currentCategory == SEARCH
+    private val content: View
+        get() = when {
+            isHome -> binding.home
+            isSearch -> binding.searchInput
+            else -> binding.channels
+        }
+
+    private val runSearch = Runnable { if (isSearch) showCategory(SEARCH, force = true) }
+
+    private val voiceSearch = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!spoken.isNullOrBlank()) {
+            binding.searchInput.setText(spoken)
+            binding.searchInput.setSelection(spoken.length)
+            handler.removeCallbacks(runSearch)
+            runSearch.run()
+            if (channelAdapter.itemCount > 0) binding.channels.requestFocus()
+        }
+    }
 
     /** Focus left the sidebar: commit any half-scrolled category and re-select the active one. */
     private val focusListener = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
@@ -84,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         updater = Updater(this)
         filter = ChannelStore.filter(this)
         setUpFilterBar()
+        setUpSearch()
 
         binding.sidebar.adapter = sidebarAdapter
         binding.sidebar.setOnChildViewHolderSelectedListener(object : OnChildViewHolderSelectedListener() {
@@ -111,7 +139,9 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // Back from the channel grid goes to the categories first, then exits.
-                if (binding.channels.hasFocus() || binding.home.hasFocus() || binding.filterBar.hasFocus()) {
+                if (binding.channels.hasFocus() || binding.home.hasFocus() || binding.filterBar.hasFocus() ||
+                    binding.searchBar.hasFocus()
+                ) {
                     binding.sidebar.requestFocus()
                 } else {
                     isEnabled = false
@@ -140,7 +170,7 @@ class MainActivity : AppCompatActivity() {
                 refreshHome()
                 return
             }
-            val updated = filter.apply(filtered(currentCategory))
+            val updated = gridChannels()
             channelAdapter.favorites = ChannelStore.favorites(this)
             if (updated != channelAdapter.items) {
                 val position = binding.channels.selectedPosition
@@ -183,12 +213,12 @@ class MainActivity : AppCompatActivity() {
     private fun refreshSidebar() {
         val favorites = ChannelStore.favorites(this)
         val recent = ChannelStore.recent(this)
-        val categories = listOf(Dashboard.HOME) + Categories.build(allChannels, favorites, recent)
+        val categories = listOf(Dashboard.HOME, SEARCH) + Categories.build(allChannels, favorites, recent)
         if (currentCategory !in categories) currentCategory = categories.first()
 
         val items = categories.map {
-            val count = if (it == Dashboard.HOME) null else Categories.filter(it, allChannels, favorites, recent).size
-            SidebarItem(it, it, count)
+            val count = if (it == Dashboard.HOME || it == SEARCH) null else Categories.filter(it, allChannels, favorites, recent).size
+            SidebarItem(it, if (it == SEARCH) getString(R.string.search) else it, count)
         } + listOf(
             SidebarItem(ACTION_REFRESH, getString(R.string.refresh), isAction = true),
             SidebarItem(ACTION_SOURCES, getString(R.string.channel_sources), isAction = true),
@@ -222,9 +252,14 @@ class MainActivity : AppCompatActivity() {
         sidebarAdapter.activeKey = category
         binding.home.visibility = if (isHome) View.VISIBLE else View.GONE
         binding.channels.visibility = if (isHome) View.GONE else View.VISIBLE
-        binding.filterBar.visibility = if (isHome) View.GONE else View.VISIBLE
+        binding.filterBar.visibility = if (isHome || isSearch) View.GONE else View.VISIBLE
+        binding.searchBar.visibility = if (isSearch) View.VISIBLE else View.GONE
         if (isHome) {
             showHome()
+            return
+        }
+        if (isSearch) {
+            showSearchResults()
             return
         }
         val unfiltered = filtered(category)
@@ -255,6 +290,7 @@ class MainActivity : AppCompatActivity() {
             ACTION_SOURCES -> showSourcesDialog()
             ACTION_PLAYLISTS -> showPlaylistsDialog()
             ACTION_HIDDEN -> showHiddenDialog()
+            SEARCH -> openSearch()
             ACTION_UPDATE -> update?.let { startUpdate(it) } ?: checkForUpdate(userAsked = true)
             else -> {
                 handler.removeCallbacks(applyPending)
@@ -403,6 +439,81 @@ class MainActivity : AppCompatActivity() {
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.youtube_missing, Toast.LENGTH_LONG).show()
         }
+    }
+
+    /** The list the grid shows for the current category: filtered, or search results. */
+    private fun gridChannels(): List<Channel> =
+        if (isSearch) ChannelSearch.search(allChannels, binding.searchInput.text.toString())
+        else filter.apply(filtered(currentCategory))
+
+    private fun setUpSearch() {
+        binding.searchInput.doAfterTextChanged {
+            handler.removeCallbacks(runSearch)
+            handler.postDelayed(runSearch, SEARCH_DELAY_MS)
+        }
+        binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                handler.removeCallbacks(runSearch)
+                runSearch.run()
+                hideKeyboard()
+                if (channelAdapter.itemCount > 0) binding.channels.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
+        binding.voiceSearch.setOnClickListener { startVoiceSearch() }
+    }
+
+    private fun openSearch() {
+        handler.removeCallbacks(applyPending)
+        pendingCategory = null
+        showCategory(SEARCH)
+        binding.searchInput.requestFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)?.showSoftInput(binding.searchInput, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun showSearchResults() {
+        val query = binding.searchInput.text.toString().trim()
+        val results = gridChannels()
+        channelAdapter.favorites = ChannelStore.favorites(this)
+        channelAdapter.items = results
+        binding.channels.selectedPosition = 0
+        binding.title.text = getString(R.string.search)
+        binding.subtitle.text = if (query.isEmpty()) "" else getString(R.string.search_results, results.size, query)
+        binding.empty.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
+        binding.empty.text = if (query.isEmpty()) getString(R.string.search_start) else getString(R.string.search_none, query)
+    }
+
+    /**
+     * Uses the system speech recogniser when the device has one. Fire TV usually doesn't expose it
+     * to apps, so fall back to the keyboard, whose microphone dictates on many models.
+     */
+    private fun startVoiceSearch() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.voice_prompt))
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        try {
+            voiceSearch.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show()
+            binding.searchInput.requestFocus()
+            (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)?.showSoftInput(binding.searchInput, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    private fun hideKeyboard() {
+        (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(binding.searchInput.windowToken, 0)
+    }
+
+    /** The remote's search key (where it has one) opens Search from anywhere on this screen. */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_SEARCH) {
+            openSearch()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun visibleChannels(): List<Channel> {

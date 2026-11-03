@@ -76,4 +76,12 @@
     <string name="restore_title">Bring back channels</string>
     <string name="restore_selected">Restore selected</string>
     <string name="restore_all">Restore all</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Channel, language or category, e.g. Asianet, Tamil news</string>
+    <string name="voice_search">Voice</string>
+    <string name="voice_prompt">Say a channel name</string>
+    <string name="search_start">Type or say a channel name, a language (Tamil, Hindi…) or a category (News, Movies…).</string>
+    <string name="search_none">No channels match “%1$s”.</string>
+    <string name="search_results">%1$d results for “%2$s”</string>
+    <string name="voice_unavailable">Voice search isn\'t available here. Open the keyboard and hold the remote\'s microphone button to speak instead.</string>
 </resources>

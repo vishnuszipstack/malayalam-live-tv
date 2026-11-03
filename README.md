@@ -26,6 +26,14 @@ The app opens on *Home*: a Featured row of large cards (the channel you last wat
 best-known Malayalam channels), followed by Continue watching, Favourites, Malayalam News,
 Malayalam Entertainment, Malayalam Devotional and the largest other categories.
 
+## Search
+
+*Search* (second in the sidebar, or the remote's search key where it has one) finds channels by
+name, part of a name, language or category as you type: "asianet", "media one", "tamil news".
+**Voice** uses the device's speech recogniser when there is one; Fire TV generally doesn't give
+apps one, so the app opens the keyboard instead, where holding the remote's microphone button
+dictates on many models.
+
 ## Filters
 
 Every category except Home has a filter bar above the grid (press ▲ from the top row):
