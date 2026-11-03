@@ -26,7 +26,7 @@
                 android:layout_width="34dp"
                 android:layout_height="34dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_launcher" />
+                android:src="@mipmap/ic_launcher" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -149,6 +149,18 @@
                 android:paddingBottom="28dp"
                 android:verticalSpacing="18dp"
                 app:numberOfColumns="4" />
+
+            <!-- Home dashboard: featured cards and themed rows -->
+            <androidx.leanback.widget.VerticalGridView
+                android:id="@+id/home"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:paddingTop="12dp"
+                android:paddingBottom="40dp"
+                android:verticalSpacing="6dp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/empty"

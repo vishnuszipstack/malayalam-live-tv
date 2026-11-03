@@ -20,6 +20,18 @@ shows **Malayalam channels first**, and plays HLS/DASH streams full-screen with 
 - Per-stream `User-Agent`/`Referer` (`#EXTVLCOPT`) is honoured, which some broadcasters need.
 - Channels that only stream on YouTube open in the YouTube app.
 
+## Home dashboard
+
+The app opens on *Home*: a Featured row of large cards (the channel you last watched, then the
+best-known Malayalam channels), followed by Continue watching, Favourites, Malayalam News,
+Malayalam Entertainment, Malayalam Devotional and the largest other categories.
+
+## Icon and banner
+
+`art/make_art.py` renders the launcher icon (`mipmap-*/ic_launcher.png`) and the Fire TV banner
+(`drawable-xhdpi/banner.png`). It needs Pillow and the Noto Sans Malayalam Bold font:
+`python3 art/make_art.py <font dir> app/src/main/res preview.png`.
+
 ## Remote control
 
 | Where | Button | Action |

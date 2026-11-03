@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.malayalamlive.tv.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
 
@@ -38,7 +39,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updater: Updater
     private var update: ReleaseInfo? = null
     private var allChannels: List<Channel> = emptyList()
-    private var currentCategory: String = Categories.MALAYALAM
+    private var currentCategory: String = Dashboard.HOME
     private var pendingCategory: String? = null
     private var firstLoad = true
 
@@ -46,10 +47,17 @@ class MainActivity : AppCompatActivity() {
     private val applyPending = Runnable { pendingCategory?.let { showCategory(it) }; pendingCategory = null }
 
     private val sidebarAdapter = SidebarAdapter { onSidebarClick(it) }
-    private val channelAdapter = ChannelAdapter(
-        onClick = { play(it) },
-        onLongClick = { toggleFavorite(it) },
+    private val channelAdapter: ChannelAdapter = ChannelAdapter(
+        onClick = { playFrom(channelAdapter.items, it, currentCategory) },
+        onLongClick = { position -> channelAdapter.items.getOrNull(position)?.let { toggleFavorite(it) } },
     )
+    private val homeAdapter: HomeAdapter = HomeAdapter(
+        onPlay = { row, position -> playFrom(row.channels, position, row.title) },
+        onFavorite = { toggleFavorite(it) },
+    )
+
+    private val isHome get() = currentCategory == Dashboard.HOME
+    private val content: View get() = if (isHome) binding.home else binding.channels
 
     /** Focus left the sidebar: commit any half-scrolled category and re-select the active one. */
     private val focusListener = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
@@ -88,13 +96,14 @@ class MainActivity : AppCompatActivity() {
 
         binding.channels.setNumColumns(4)
         binding.channels.adapter = channelAdapter
+        binding.home.adapter = homeAdapter
 
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener(focusListener)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // Back from the channel grid goes to the categories first, then exits.
-                if (binding.channels.hasFocus()) {
+                if (binding.channels.hasFocus() || binding.home.hasFocus()) {
                     binding.sidebar.requestFocus()
                 } else {
                     isEnabled = false
@@ -119,6 +128,10 @@ class MainActivity : AppCompatActivity() {
         // Favourites and history change while watching; refresh counts without moving focus.
         if (allChannels.isNotEmpty()) {
             refreshSidebar()
+            if (isHome) {
+                refreshHome()
+                return
+            }
             val updated = filtered(currentCategory)
             channelAdapter.favorites = ChannelStore.favorites(this)
             if (updated != channelAdapter.items) {
@@ -150,7 +163,7 @@ class MainActivity : AppCompatActivity() {
             showCategory(currentCategory, force = true)
             if (firstLoad || !binding.root.hasFocus()) {
                 firstLoad = false
-                (if (channelAdapter.items.isEmpty()) binding.sidebar else binding.channels).requestFocus()
+                (if (allChannels.isEmpty()) binding.sidebar else content).requestFocus()
             }
         }
     }
@@ -161,11 +174,12 @@ class MainActivity : AppCompatActivity() {
     private fun refreshSidebar() {
         val favorites = ChannelStore.favorites(this)
         val recent = ChannelStore.recent(this)
-        val categories = Categories.build(allChannels, favorites, recent)
+        val categories = listOf(Dashboard.HOME) + Categories.build(allChannels, favorites, recent)
         if (currentCategory !in categories) currentCategory = categories.first()
 
         val items = categories.map {
-            SidebarItem(it, it, Categories.filter(it, allChannels, favorites, recent).size)
+            val count = if (it == Dashboard.HOME) null else Categories.filter(it, allChannels, favorites, recent).size
+            SidebarItem(it, it, count)
         } + listOf(
             SidebarItem(ACTION_REFRESH, getString(R.string.refresh), isAction = true),
             SidebarItem(ACTION_SOURCES, getString(R.string.channel_sources), isAction = true),
@@ -196,6 +210,12 @@ class MainActivity : AppCompatActivity() {
         if (category == currentCategory && !force) return
         currentCategory = category
         sidebarAdapter.activeKey = category
+        binding.home.visibility = if (isHome) View.VISIBLE else View.GONE
+        binding.channels.visibility = if (isHome) View.GONE else View.VISIBLE
+        if (isHome) {
+            showHome()
+            return
+        }
         val channels = filtered(category)
         channelAdapter.favorites = ChannelStore.favorites(this)
         channelAdapter.items = channels
@@ -216,23 +236,52 @@ class MainActivity : AppCompatActivity() {
                 handler.removeCallbacks(applyPending)
                 pendingCategory = null
                 showCategory(item.key)
-                if (channelAdapter.items.isNotEmpty()) binding.channels.requestFocus()
+                if (isHome || channelAdapter.items.isNotEmpty()) content.requestFocus()
             }
         }
     }
 
-    private fun play(position: Int) {
-        val channel = channelAdapter.items.getOrNull(position) ?: return
+    private fun playFrom(list: List<Channel>, position: Int, title: String) {
+        val channel = list.getOrNull(position) ?: return
         if (channel.isYouTube) {
             openYouTube(channel)
             return
         }
-        val playable = channelAdapter.items.filterNot { it.isYouTube }
+        val playable = list.filterNot { it.isYouTube }
         ChannelStore.playing = playable
-        ChannelStore.playingTitle = currentCategory
+        ChannelStore.playingTitle = title
         startActivity(
             Intent(this, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_INDEX, playable.indexOf(channel)),
         )
+    }
+
+    private fun showHome() {
+        val malayalam = allChannels.count { it.isMalayalam }
+        binding.title.text = getString(greeting())
+        binding.subtitle.text = getString(R.string.home_summary, allChannels.size, malayalam)
+        binding.empty.visibility = if (allChannels.isEmpty()) View.VISIBLE else View.GONE
+        binding.empty.text = getString(R.string.empty)
+        homeAdapter.favorites = ChannelStore.favorites(this)
+        homeAdapter.rows = Dashboard.rows(allChannels, homeAdapter.favorites, ChannelStore.recent(this))
+        binding.home.selectedPosition = 0
+    }
+
+    /** Rebuilds the rows after watching or favouriting, keeping the focused row when nothing moved. */
+    private fun refreshHome() {
+        val favorites = ChannelStore.favorites(this)
+        val rows = Dashboard.rows(allChannels, favorites, ChannelStore.recent(this))
+        if (rows == homeAdapter.rows && favorites == homeAdapter.favorites) return
+        val position = binding.home.selectedPosition
+        homeAdapter.favorites = favorites
+        homeAdapter.rows = rows
+        binding.home.selectedPosition = position.coerceIn(0, (rows.size - 1).coerceAtLeast(0))
+        binding.title.text = getString(greeting())
+    }
+
+    private fun greeting(): Int = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+        in 5..11 -> R.string.good_morning
+        in 12..16 -> R.string.good_afternoon
+        else -> R.string.good_evening
     }
 
     private fun openYouTube(channel: Channel) {
@@ -244,13 +293,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toggleFavorite(position: Int) {
-        val channel = channelAdapter.items.getOrNull(position) ?: return
+    private fun toggleFavorite(channel: Channel) {
         val added = ChannelStore.toggleFavorite(this, channel)
         val message = if (added) R.string.favorite_added else R.string.favorite_removed
         Toast.makeText(this, getString(message, channel.name), Toast.LENGTH_SHORT).show()
-        channelAdapter.favorites = ChannelStore.favorites(this)
-        channelAdapter.notifyItemChanged(position)
+        if (isHome) {
+            refreshHome()
+        } else {
+            channelAdapter.favorites = ChannelStore.favorites(this)
+            val position = channelAdapter.items.indexOf(channel)
+            if (position >= 0) channelAdapter.notifyItemChanged(position)
+        }
         refreshSidebar()
     }
 

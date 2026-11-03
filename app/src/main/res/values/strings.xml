@@ -46,4 +46,8 @@
     <string name="allow_install_message">To install updates, turn on "Install unknown apps" for Malayalam Live TV, then choose the update again.</string>
     <string name="open_settings">Open settings</string>
     <string name="allow_install_manual">Go to Settings → My Fire TV → Developer options → Install unknown apps and turn on Malayalam Live TV.</string>
+    <string name="good_morning">Good morning</string>
+    <string name="good_afternoon">Good afternoon</string>
+    <string name="good_evening">Good evening</string>
+    <string name="home_summary">%1$d channels · %2$d in Malayalam</string>
 </resources>
