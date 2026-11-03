@@ -62,10 +62,15 @@ class PlaylistRepository(private val context: Context) {
         }.awaitAll()
 
         val failed = results.filter { it.second == null }.map { it.first.title }
+        // Language lookup lists; a failure here only means fewer channels get a language.
+        val languageLists = LanguageIndex.LISTS.map { (url, language) ->
+            async(Dispatchers.IO) { fetch(url, forceRefresh)?.let { language to it } }
+        }.awaitAll().filterNotNull()
         val channels = withContext(Dispatchers.Default) {
-            ChannelMerger.merge(
+            val merged = ChannelMerger.merge(
                 results.mapNotNull { (source, text) -> text?.let { M3uParser.parse(it, source.defaultLanguage) } },
             )
+            Categories.sort(LanguageIndex.annotate(merged, LanguageIndex.build(languageLists)))
         }
         Result(channels, failed)
     }

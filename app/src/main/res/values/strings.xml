@@ -50,4 +50,22 @@
     <string name="good_afternoon">Good afternoon</string>
     <string name="good_evening">Good evening</string>
     <string name="home_summary">%1$d channels · %2$d in Malayalam</string>
+    <string name="filter_language">Language: %1$s</string>
+    <string name="filter_language_all">All languages</string>
+    <string name="filter_quality">Quality: %1$s</string>
+    <string name="filter_quality_any">Any</string>
+    <string name="filter_quality_hd">HD (720p and above)</string>
+    <string name="filter_quality_full_hd">Full HD (1080p)</string>
+    <string name="filter_sort">Sort: %1$s</string>
+    <string name="sort_default">Malayalam first</string>
+    <string name="sort_name">Name A–Z</string>
+    <string name="sort_quality">Best quality</string>
+    <string name="sort_sources">Most backup streams</string>
+    <string name="filter_hide_region">Hide region-locked</string>
+    <string name="filter_hide_part_time">Hide part-time</string>
+    <string name="filter_hide_youtube">Hide YouTube</string>
+    <string name="filter_clear">Clear filters</string>
+    <string name="filter_option_count">%1$s (%2$d)</string>
+    <string name="filtered_count">%1$d of %2$d channels · filtered</string>
+    <string name="empty_filtered">No channels match these filters. Choose Clear filters to see them all.</string>
 </resources>

@@ -20,10 +20,10 @@ class CategoriesTest {
     )
 
     @Test
-    fun orderIsMalayalamRecentFavouritesLanguagesGroupsAll() {
+    fun orderIsMalayalamRecentFavouritesGroupsAll() {
         val categories = Categories.build(channels, favorites = setOf("ndtvindia"), recent = listOf("suntv"))
         assertEquals(
-            listOf("Malayalam", "Recently watched", "Favourites", "Tamil", "Entertainment", "News", "All channels"),
+            listOf("Malayalam", "Recently watched", "Favourites", "Entertainment", "News", "All channels"),
             categories,
         )
     }

@@ -128,6 +128,32 @@
                 android:textSize="22sp" />
         </LinearLayout>
 
+        <!-- Filters for the channel grid (hidden on Home) -->
+        <HorizontalScrollView
+            android:id="@+id/filterBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:clipToPadding="false"
+            android:paddingStart="10dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView android:id="@+id/chipLanguage" style="@style/FilterChip" />
+                <TextView android:id="@+id/chipQuality" style="@style/FilterChip" />
+                <TextView android:id="@+id/chipSort" style="@style/FilterChip" />
+                <TextView android:id="@+id/chipRegion" style="@style/FilterChip" android:text="@string/filter_hide_region" />
+                <TextView android:id="@+id/chipPartTime" style="@style/FilterChip" android:text="@string/filter_hide_part_time" />
+                <TextView android:id="@+id/chipYouTube" style="@style/FilterChip" android:text="@string/filter_hide_youtube" />
+                <TextView android:id="@+id/chipClear" style="@style/FilterChip" android:text="@string/filter_clear" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -140,6 +166,7 @@
                 android:id="@+id/channels"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                app:focusOutFront="true"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:horizontalSpacing="18dp"

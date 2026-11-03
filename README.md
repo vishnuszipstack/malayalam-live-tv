@@ -26,6 +26,16 @@ The app opens on *Home*: a Featured row of large cards (the channel you last wat
 best-known Malayalam channels), followed by Continue watching, Favourites, Malayalam News,
 Malayalam Entertainment, Malayalam Devotional and the largest other categories.
 
+## Filters
+
+Every category except Home has a filter bar above the grid (press ▲ from the top row):
+**Language** (with channel counts for the current category), **Quality** (any / HD / Full HD),
+**Sort** (Malayalam first, name, best quality, most backup streams), and switches to hide
+region-locked, part-time and YouTube-only channels. Filters are remembered.
+
+Languages come from the playlist when it says, otherwise from iptv-org's per-language lists
+(used only as a lookup) and finally from the channel name.
+
 ## Icon and banner
 
 `art/make_art.py` renders the launcher icon (`mipmap-*/ic_launcher.png`) and the Fire TV banner

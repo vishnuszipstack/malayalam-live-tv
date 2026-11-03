@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updater: Updater
     private var update: ReleaseInfo? = null
     private var allChannels: List<Channel> = emptyList()
+    private var filter = ChannelFilter()
     private var currentCategory: String = Dashboard.HOME
     private var pendingCategory: String? = null
     private var firstLoad = true
@@ -76,6 +77,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         repository = PlaylistRepository(this)
         updater = Updater(this)
+        filter = ChannelStore.filter(this)
+        setUpFilterBar()
 
         binding.sidebar.adapter = sidebarAdapter
         binding.sidebar.setOnChildViewHolderSelectedListener(object : OnChildViewHolderSelectedListener() {
@@ -103,7 +106,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // Back from the channel grid goes to the categories first, then exits.
-                if (binding.channels.hasFocus() || binding.home.hasFocus()) {
+                if (binding.channels.hasFocus() || binding.home.hasFocus() || binding.filterBar.hasFocus()) {
                     binding.sidebar.requestFocus()
                 } else {
                     isEnabled = false
@@ -132,7 +135,7 @@ class MainActivity : AppCompatActivity() {
                 refreshHome()
                 return
             }
-            val updated = filtered(currentCategory)
+            val updated = filter.apply(filtered(currentCategory))
             channelAdapter.favorites = ChannelStore.favorites(this)
             if (updated != channelAdapter.items) {
                 val position = binding.channels.selectedPosition
@@ -212,18 +215,31 @@ class MainActivity : AppCompatActivity() {
         sidebarAdapter.activeKey = category
         binding.home.visibility = if (isHome) View.VISIBLE else View.GONE
         binding.channels.visibility = if (isHome) View.GONE else View.VISIBLE
+        binding.filterBar.visibility = if (isHome) View.GONE else View.VISIBLE
         if (isHome) {
             showHome()
             return
         }
-        val channels = filtered(category)
+        val unfiltered = filtered(category)
+        val channels = filter.apply(unfiltered)
         channelAdapter.favorites = ChannelStore.favorites(this)
         channelAdapter.items = channels
         binding.channels.selectedPosition = 0
         binding.title.text = category
-        binding.subtitle.text = resources.getQuantityString(R.plurals.channels, channels.size, channels.size)
+        binding.subtitle.text = if (filter.isActive) {
+            getString(R.string.filtered_count, channels.size, unfiltered.size)
+        } else {
+            resources.getQuantityString(R.plurals.channels, channels.size, channels.size)
+        }
         binding.empty.visibility = if (channels.isEmpty()) View.VISIBLE else View.GONE
-        binding.empty.text = getString(if (allChannels.isEmpty()) R.string.empty else R.string.empty_category)
+        binding.empty.text = getString(
+            when {
+                allChannels.isEmpty() -> R.string.empty
+                unfiltered.isNotEmpty() -> R.string.empty_filtered
+                else -> R.string.empty_category
+            },
+        )
+        updateFilterChips()
     }
 
     private fun onSidebarClick(item: SidebarItem) {
@@ -253,6 +269,94 @@ class MainActivity : AppCompatActivity() {
         startActivity(
             Intent(this, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_INDEX, playable.indexOf(channel)),
         )
+    }
+
+    private fun setUpFilterBar() {
+        binding.chipLanguage.setOnClickListener { chooseLanguage() }
+        binding.chipQuality.setOnClickListener { chooseQuality() }
+        binding.chipSort.setOnClickListener { chooseSort() }
+        binding.chipRegion.setOnClickListener { applyFilter(filter.copy(hideRegionLocked = !filter.hideRegionLocked)) }
+        binding.chipPartTime.setOnClickListener { applyFilter(filter.copy(hidePartTime = !filter.hidePartTime)) }
+        binding.chipYouTube.setOnClickListener { applyFilter(filter.copy(hideYouTube = !filter.hideYouTube)) }
+        binding.chipClear.setOnClickListener {
+            applyFilter(ChannelFilter())
+            // The Clear chip hides itself; keep focus in the bar.
+            binding.chipLanguage.requestFocus()
+        }
+        updateFilterChips()
+    }
+
+    private fun applyFilter(updated: ChannelFilter) {
+        filter = updated
+        ChannelStore.saveFilter(this, updated)
+        if (!isHome) showCategory(currentCategory, force = true)
+        updateFilterChips()
+    }
+
+    private fun updateFilterChips() {
+        with(binding) {
+            chipLanguage.text = getString(R.string.filter_language, filter.language ?: getString(R.string.filter_language_all))
+            chipLanguage.isActivated = filter.language != null
+            chipQuality.text = getString(
+                R.string.filter_quality,
+                when (filter.minQuality) {
+                    0 -> getString(R.string.filter_quality_any)
+                    1080 -> "Full HD"
+                    else -> "HD"
+                },
+            )
+            chipQuality.isActivated = filter.minQuality > 0
+            chipSort.text = getString(R.string.filter_sort, getString(sortLabel(filter.sort)))
+            chipSort.isActivated = filter.sort != ChannelFilter.Sort.DEFAULT
+            chipRegion.isActivated = filter.hideRegionLocked
+            chipPartTime.isActivated = filter.hidePartTime
+            chipYouTube.isActivated = filter.hideYouTube
+            chipClear.visibility = if (filter.isActive) View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun sortLabel(sort: ChannelFilter.Sort) = when (sort) {
+        ChannelFilter.Sort.DEFAULT -> R.string.sort_default
+        ChannelFilter.Sort.NAME -> R.string.sort_name
+        ChannelFilter.Sort.QUALITY -> R.string.sort_quality
+        ChannelFilter.Sort.SOURCES -> R.string.sort_sources
+    }
+
+    /** Languages in the current category, with counts, so empty choices never appear. */
+    private fun chooseLanguage() {
+        val category = filtered(currentCategory)
+        val counts = ChannelFilter.languageCounts(category)
+        val labels = listOf(getString(R.string.filter_option_count, getString(R.string.filter_language_all), category.size)) +
+            counts.map { (language, count) -> getString(R.string.filter_option_count, language, count) }
+        val values = listOf<String?>(null) + counts.map { it.first }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.filter_language_all)
+            .setSingleChoiceItems(labels.toTypedArray(), values.indexOf(filter.language).coerceAtLeast(0)) { dialog, which ->
+                dialog.dismiss()
+                applyFilter(filter.copy(language = values[which]))
+            }
+            .show()
+    }
+
+    private fun chooseQuality() {
+        val values = listOf(0, 720, 1080)
+        val labels = listOf(R.string.filter_quality_any, R.string.filter_quality_hd, R.string.filter_quality_full_hd).map { getString(it) }
+        AlertDialog.Builder(this)
+            .setSingleChoiceItems(labels.toTypedArray(), values.indexOf(filter.minQuality).coerceAtLeast(0)) { dialog, which ->
+                dialog.dismiss()
+                applyFilter(filter.copy(minQuality = values[which]))
+            }
+            .show()
+    }
+
+    private fun chooseSort() {
+        val values = ChannelFilter.Sort.values()
+        AlertDialog.Builder(this)
+            .setSingleChoiceItems(values.map { getString(sortLabel(it)) }.toTypedArray(), values.indexOf(filter.sort)) { dialog, which ->
+                dialog.dismiss()
+                applyFilter(filter.copy(sort = values[which]))
+            }
+            .show()
     }
 
     private fun showHome() {

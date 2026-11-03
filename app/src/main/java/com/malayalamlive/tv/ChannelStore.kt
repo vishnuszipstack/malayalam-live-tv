@@ -54,5 +54,29 @@ object ChannelStore {
         prefs(context).edit().putInt("resize_${channel.id}", mode).apply()
     }
 
+    fun filter(context: Context): ChannelFilter {
+        val p = prefs(context)
+        return ChannelFilter(
+            language = p.getString("filter_language", null),
+            minQuality = p.getInt("filter_min_quality", 0),
+            hideRegionLocked = p.getBoolean("filter_hide_region", false),
+            hidePartTime = p.getBoolean("filter_hide_part_time", false),
+            hideYouTube = p.getBoolean("filter_hide_youtube", false),
+            sort = runCatching { ChannelFilter.Sort.valueOf(p.getString("filter_sort", null)!!) }
+                .getOrDefault(ChannelFilter.Sort.DEFAULT),
+        )
+    }
+
+    fun saveFilter(context: Context, filter: ChannelFilter) {
+        prefs(context).edit()
+            .putString("filter_language", filter.language)
+            .putInt("filter_min_quality", filter.minQuality)
+            .putBoolean("filter_hide_region", filter.hideRegionLocked)
+            .putBoolean("filter_hide_part_time", filter.hidePartTime)
+            .putBoolean("filter_hide_youtube", filter.hideYouTube)
+            .putString("filter_sort", filter.sort.name)
+            .apply()
+    }
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

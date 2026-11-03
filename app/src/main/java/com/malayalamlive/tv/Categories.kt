@@ -12,15 +12,13 @@ object Categories {
 
     fun build(channels: List<Channel>, favorites: Set<String>, recent: List<String>): List<String> {
         val ids = channels.mapTo(HashSet()) { it.id }
-        val languages = channels.flatMap { it.languages }.distinct()
-            .filterNot { it.equals(MALAYALAM, ignoreCase = true) }.sortedBy { it.lowercase() }
+        // Other languages are picked with the Language filter rather than listed here.
         val groups = channels.flatMap { it.groups }.distinct()
-            .filterNot { it.equals(MALAYALAM, ignoreCase = true) || it in languages }.sortedBy { it.lowercase() }
+            .filterNot { it.equals(MALAYALAM, ignoreCase = true) }.sortedBy { it.lowercase() }
         return buildList {
             if (channels.any { it.isMalayalam }) add(MALAYALAM)
             if (recent.any { it in ids }) add(RECENT)
             if (channels.any { isFavorite(it, favorites) }) add(FAVORITES)
-            addAll(languages)
             addAll(groups)
             add(ALL)
         }
