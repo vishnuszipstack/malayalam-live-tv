@@ -15,6 +15,7 @@ object ChannelStore {
     private const val KEY_FAVORITES = "favorites"
     private const val KEY_RECENT = "recent"
     private const val MAX_RECENT = 15
+    private const val KEY_HIDDEN = "hidden"
 
     fun favorites(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_FAVORITES, emptySet())!!.toSet()
@@ -52,6 +53,18 @@ object ChannelStore {
 
     fun setResizeMode(context: Context, channel: Channel, mode: Int) {
         prefs(context).edit().putInt("resize_${channel.id}", mode).apply()
+    }
+
+    /** Channels the viewer removed; kept by id so they stay gone after playlist refreshes. */
+    fun hidden(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_HIDDEN, emptySet())!!.toSet()
+
+    fun hide(context: Context, channel: Channel) {
+        prefs(context).edit().putStringSet(KEY_HIDDEN, hidden(context) + channel.id).apply()
+    }
+
+    fun unhide(context: Context, ids: Collection<String>) {
+        prefs(context).edit().putStringSet(KEY_HIDDEN, hidden(context) - ids.toSet()).apply()
     }
 
     fun filter(context: Context): ChannelFilter {

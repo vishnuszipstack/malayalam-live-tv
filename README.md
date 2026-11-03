@@ -47,7 +47,7 @@ Languages come from the playlist when it says, otherwise from iptv-org's per-lan
 | Where | Button | Action |
 |---|---|---|
 | Channel grid | OK | Play |
-| | Hold OK | Add / remove favourite |
+| | Hold OK | Menu: add to / remove from favourites, or remove the channel (sidebar → *Removed channels* brings it back) |
 | | ◀ (from the first column) or Back | Categories |
 | Player | ▲ / ▼ | Previous / next channel |
 | | ◀ or OK | Channel list |

@@ -21,7 +21,7 @@
     <string name="favorite_removed">Removed %1$s from favourites</string>
     <string name="empty">No channels loaded. Check the internet connection, then choose Refresh channels.</string>
     <string name="empty_category">No channels here yet.</string>
-    <string name="hint">OK  Play     ·     Hold OK  Add to favourites     ·     ◀ or Back  Categories</string>
+    <string name="hint">OK  Play     ·     Hold OK  Favourite or remove     ·     ◀ or Back  Categories</string>
     <string name="sources_count">%1$d sources</string>
     <string name="india_only">Region locked</string>
     <string name="youtube_missing">This channel streams on YouTube. Install the YouTube app to watch it.</string>
@@ -68,4 +68,12 @@
     <string name="filter_option_count">%1$s (%2$d)</string>
     <string name="filtered_count">%1$d of %2$d channels · filtered</string>
     <string name="empty_filtered">No channels match these filters. Choose Clear filters to see them all.</string>
+    <string name="option_favorite">Add to favourites</string>
+    <string name="option_unfavorite">Remove from favourites</string>
+    <string name="option_remove">Remove channel</string>
+    <string name="channel_removed">Removed %1$s. Bring it back from Removed channels in the sidebar.</string>
+    <string name="removed_channels">Removed channels (%1$d)</string>
+    <string name="restore_title">Bring back channels</string>
+    <string name="restore_selected">Restore selected</string>
+    <string name="restore_all">Restore all</string>
 </resources>

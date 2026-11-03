@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SOURCES = "action:sources"
         const val ACTION_PLAYLISTS = "action:playlists"
         const val ACTION_UPDATE = "action:update"
+        const val ACTION_HIDDEN = "action:hidden"
         const val CATEGORY_DELAY_MS = 180L
     }
 
@@ -38,6 +39,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var repository: PlaylistRepository
     private lateinit var updater: Updater
     private var update: ReleaseInfo? = null
+    /** Everything the playlists returned, including channels the viewer removed. */
+    private var loadedChannels: List<Channel> = emptyList()
+
+    /** What the app shows: [loadedChannels] minus removed ones. */
     private var allChannels: List<Channel> = emptyList()
     private var filter = ChannelFilter()
     private var currentCategory: String = Dashboard.HOME
@@ -50,11 +55,11 @@ class MainActivity : AppCompatActivity() {
     private val sidebarAdapter = SidebarAdapter { onSidebarClick(it) }
     private val channelAdapter: ChannelAdapter = ChannelAdapter(
         onClick = { playFrom(channelAdapter.items, it, currentCategory) },
-        onLongClick = { position -> channelAdapter.items.getOrNull(position)?.let { toggleFavorite(it) } },
+        onLongClick = { position -> channelAdapter.items.getOrNull(position)?.let { showChannelOptions(it) } },
     )
     private val homeAdapter: HomeAdapter = HomeAdapter(
         onPlay = { row, position -> playFrom(row.channels, position, row.title) },
-        onFavorite = { toggleFavorite(it) },
+        onFavorite = { showChannelOptions(it) },
     )
 
     private val isHome get() = currentCategory == Dashboard.HOME
@@ -152,7 +157,8 @@ class MainActivity : AppCompatActivity() {
         binding.status.text = getString(R.string.loading)
         lifecycleScope.launch {
             val result = repository.load(forceRefresh)
-            allChannels = result.channels
+            loadedChannels = result.channels
+            allChannels = visibleChannels()
             binding.progress.visibility = View.GONE
             binding.status.text = getString(R.string.channel_count, allChannels.size)
             if (result.failedSources.isNotEmpty()) {
@@ -187,6 +193,7 @@ class MainActivity : AppCompatActivity() {
             SidebarItem(ACTION_REFRESH, getString(R.string.refresh), isAction = true),
             SidebarItem(ACTION_SOURCES, getString(R.string.channel_sources), isAction = true),
             SidebarItem(ACTION_PLAYLISTS, getString(R.string.my_playlists), isAction = true),
+        ) + hiddenSidebarItem() + listOf(
             SidebarItem(
                 ACTION_UPDATE,
                 update?.let { getString(R.string.update_to, it.versionName) }
@@ -247,6 +254,7 @@ class MainActivity : AppCompatActivity() {
             ACTION_REFRESH -> load(forceRefresh = true)
             ACTION_SOURCES -> showSourcesDialog()
             ACTION_PLAYLISTS -> showPlaylistsDialog()
+            ACTION_HIDDEN -> showHiddenDialog()
             ACTION_UPDATE -> update?.let { startUpdate(it) } ?: checkForUpdate(userAsked = true)
             else -> {
                 handler.removeCallbacks(applyPending)
@@ -395,6 +403,78 @@ class MainActivity : AppCompatActivity() {
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.youtube_missing, Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun visibleChannels(): List<Channel> {
+        val hidden = ChannelStore.hidden(this)
+        return loadedChannels.filterNot { it.id in hidden }
+    }
+
+    /** Only shown once something has been removed. */
+    private fun hiddenSidebarItem(): List<SidebarItem> {
+        val count = ChannelStore.hidden(this).count { id -> loadedChannels.any { it.id == id } }
+        return if (count == 0) emptyList() else listOf(
+            SidebarItem(ACTION_HIDDEN, getString(R.string.removed_channels, count), isAction = true),
+        )
+    }
+
+    /** Hold OK on a channel: favourite or remove it. */
+    private fun showChannelOptions(channel: Channel) {
+        val isFavorite = Categories.isFavorite(channel, ChannelStore.favorites(this))
+        val options = arrayOf(
+            getString(if (isFavorite) R.string.option_unfavorite else R.string.option_favorite),
+            getString(R.string.option_remove),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(channel.name)
+            .setItems(options) { _, which ->
+                if (which == 0) toggleFavorite(channel) else removeChannel(channel)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun removeChannel(channel: Channel) {
+        ChannelStore.hide(this, channel)
+        Toast.makeText(this, getString(R.string.channel_removed, channel.name), Toast.LENGTH_LONG).show()
+        reapplyHidden()
+    }
+
+    private fun reapplyHidden() {
+        allChannels = visibleChannels()
+        binding.status.text = getString(R.string.channel_count, allChannels.size)
+        refreshSidebar()
+        if (isHome) {
+            refreshHome()
+        } else {
+            // Keep the cursor near where it was rather than jumping to the top.
+            val position = binding.channels.selectedPosition
+            showCategory(currentCategory, force = true)
+            binding.channels.selectedPosition = position.coerceIn(0, (channelAdapter.itemCount - 1).coerceAtLeast(0))
+        }
+    }
+
+    private fun showHiddenDialog() {
+        val hidden = ChannelStore.hidden(this)
+        val removed = loadedChannels.filter { it.id in hidden }.sortedBy { it.name.lowercase() }
+        if (removed.isEmpty()) return
+        val checked = BooleanArray(removed.size)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.restore_title)
+            .setMultiChoiceItems(removed.map { it.name }.toTypedArray(), checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(R.string.restore_selected) { _, _ ->
+                ChannelStore.unhide(this, removed.filterIndexed { i, _ -> checked[i] }.map { it.id })
+                reapplyHidden()
+            }
+            .setNeutralButton(R.string.restore_all) { _, _ ->
+                // Also clears ids no playlist lists any more.
+                ChannelStore.unhide(this, hidden)
+                reapplyHidden()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun toggleFavorite(channel: Channel) {
