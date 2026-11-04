@@ -27,6 +27,8 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.core.widget.doAfterTextChanged
 import androidx.leanback.widget.OnChildViewHolderSelectedListener
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.malayalamlive.tv.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
@@ -73,6 +75,11 @@ class MainActivity : AppCompatActivity() {
         onFavorite = { showChannelOptions(it) },
     )
 
+    /** Leanback grids on TV, plain lists on touch screens (see ListCompat.kt). */
+    private val channelsView: RecyclerView get() = binding.channels ?: binding.channelList!!
+    private val homeView: RecyclerView get() = binding.home ?: binding.homeList!!
+    private val sidebarView: RecyclerView get() = binding.sidebar ?: binding.sidebarList!!
+
     /** Only the phone layout has a drawer (as its root); TV and tablets show the sidebar permanently. */
     private val drawerLayout: DrawerLayout? get() = binding.root as? DrawerLayout
 
@@ -80,9 +87,9 @@ class MainActivity : AppCompatActivity() {
     private val isSearch get() = currentCategory == SEARCH
     private val content: View
         get() = when {
-            isHome -> binding.home
+            isHome -> homeView
             isSearch -> binding.searchInput
-            else -> binding.channels
+            else -> channelsView
         }
 
     private val runSearch = Runnable { if (isSearch) showCategory(SEARCH, force = true) }
@@ -94,13 +101,13 @@ class MainActivity : AppCompatActivity() {
             binding.searchInput.setSelection(spoken.length)
             handler.removeCallbacks(runSearch)
             runSearch.run()
-            if (channelAdapter.itemCount > 0) binding.channels.requestFocus()
+            if (channelAdapter.itemCount > 0) channelsView.requestFocus()
         }
     }
 
     /** Focus left the sidebar: commit any half-scrolled category and re-select the active one. */
     private val focusListener = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
-        if (newFocus != null && !isInside(newFocus, binding.sidebar)) {
+        if (newFocus != null && !isInside(newFocus, sidebarView)) {
             if (pendingCategory != null) {
                 handler.removeCallbacks(applyPending)
                 applyPending.run()
@@ -119,8 +126,8 @@ class MainActivity : AppCompatActivity() {
         setUpFilterBar()
         setUpSearch()
 
-        binding.sidebar.adapter = sidebarAdapter
-        binding.sidebar.setOnChildViewHolderSelectedListener(object : OnChildViewHolderSelectedListener() {
+        sidebarView.adapter = sidebarAdapter
+        binding.sidebar?.setOnChildViewHolderSelectedListener(object : OnChildViewHolderSelectedListener() {
             override fun onChildViewHolderSelected(
                 parent: RecyclerView,
                 child: RecyclerView.ViewHolder?,
@@ -129,7 +136,7 @@ class MainActivity : AppCompatActivity() {
             ) {
                 val item = sidebarAdapter.items.getOrNull(position) ?: return
                 // Categories switch as you scroll through them; actions wait for OK.
-                if (item.isAction || !binding.sidebar.hasFocus()) return
+                if (item.isAction || !sidebarView.hasFocus()) return
                 pendingCategory = item.key
                 handler.removeCallbacks(applyPending)
                 handler.postDelayed(applyPending, CATEGORY_DELAY_MS)
@@ -139,15 +146,18 @@ class MainActivity : AppCompatActivity() {
         // Phones (the drawer layout) size the grid to the screen; TV and tablets use four columns.
         val drawer = drawerLayout
         if (drawer != null) {
-            binding.channels.setNumColumns(maxOf(2, resources.configuration.screenWidthDp / 180))
+            channelsView.layoutManager = GridLayoutManager(this, maxOf(2, resources.configuration.screenWidthDp / 180))
+            channelsView.addItemDecoration(SpacingDecoration(dp(12)))
+            homeView.layoutManager = LinearLayoutManager(this)
+            sidebarView.layoutManager = LinearLayoutManager(this)
             binding.menuButton?.setOnClickListener { drawer.openDrawer(GravityCompat.START) }
             binding.searchButton?.setOnClickListener { openSearch() }
         } else {
-            binding.channels.setNumColumns(4)
+            binding.channels?.setNumColumns(4)
         }
         savedInstanceState?.getString(STATE_CATEGORY)?.let { currentCategory = it }
-        binding.channels.adapter = channelAdapter
-        binding.home.adapter = homeAdapter
+        channelsView.adapter = channelAdapter
+        homeView.adapter = homeAdapter
 
         binding.root.viewTreeObserver.addOnGlobalFocusChangeListener(focusListener)
 
@@ -160,7 +170,7 @@ class MainActivity : AppCompatActivity() {
                         drawer.isDrawerOpen(GravityCompat.START) -> drawer.closeDrawer(GravityCompat.START)
                         !isHome -> {
                             showCategory(Dashboard.HOME)
-                            binding.home.scrollToPosition(0)
+                            homeView.scrollToPosition(0)
                         }
                         else -> {
                             isEnabled = false
@@ -171,10 +181,10 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 // Back from the channel grid goes to the categories first, then exits.
-                if (binding.channels.hasFocus() || binding.home.hasFocus() || binding.filterBar.hasFocus() ||
+                if (channelsView.hasFocus() || homeView.hasFocus() || binding.filterBar.hasFocus() ||
                     binding.searchBar.hasFocus()
                 ) {
-                    binding.sidebar.requestFocus()
+                    sidebarView.requestFocus()
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -210,9 +220,9 @@ class MainActivity : AppCompatActivity() {
             val updated = gridChannels()
             channelAdapter.favorites = ChannelStore.favorites(this)
             if (updated != channelAdapter.items) {
-                val position = binding.channels.selectedPosition
+                val position = channelsView.selection
                 channelAdapter.items = updated
-                binding.channels.selectedPosition = position.coerceIn(0, (updated.size - 1).coerceAtLeast(0))
+                channelsView.selection = position.coerceIn(0, (updated.size - 1).coerceAtLeast(0))
             } else {
                 channelAdapter.notifyItemRangeChanged(0, updated.size)
             }
@@ -239,7 +249,7 @@ class MainActivity : AppCompatActivity() {
             showCategory(currentCategory, force = true)
             if (firstLoad || !binding.root.hasFocus()) {
                 firstLoad = false
-                (if (allChannels.isEmpty()) binding.sidebar else content).requestFocus()
+                (if (allChannels.isEmpty()) sidebarView else content).requestFocus()
             }
         }
     }
@@ -269,26 +279,26 @@ class MainActivity : AppCompatActivity() {
             ),
         )
         if (items != sidebarAdapter.items) {
-            val hadFocus = binding.sidebar.hasFocus()
-            val selectedKey = sidebarAdapter.items.getOrNull(binding.sidebar.selectedPosition)?.key
+            val hadFocus = sidebarView.hasFocus()
+            val selectedKey = sidebarAdapter.items.getOrNull(sidebarView.selection)?.key
             sidebarAdapter.items = items
             sidebarAdapter.activeKey = currentCategory
             val restore = items.indexOfFirst { it.key == (if (hadFocus) selectedKey else currentCategory) }
-            binding.sidebar.selectedPosition = restore.coerceAtLeast(0)
+            sidebarView.selection = restore.coerceAtLeast(0)
         }
     }
 
     private fun selectActiveCategoryRow() {
         val index = sidebarAdapter.items.indexOfFirst { it.key == currentCategory }
-        if (index >= 0 && binding.sidebar.selectedPosition != index) binding.sidebar.selectedPosition = index
+        if (index >= 0 && sidebarView.selection != index) sidebarView.selection = index
     }
 
     private fun showCategory(category: String, force: Boolean = false) {
         if (category == currentCategory && !force) return
         currentCategory = category
         sidebarAdapter.activeKey = category
-        binding.home.visibility = if (isHome) View.VISIBLE else View.GONE
-        binding.channels.visibility = if (isHome) View.GONE else View.VISIBLE
+        homeView.visibility = if (isHome) View.VISIBLE else View.GONE
+        channelsView.visibility = if (isHome) View.GONE else View.VISIBLE
         binding.filterBar.visibility = if (isHome || isSearch) View.GONE else View.VISIBLE
         binding.searchBar.visibility = if (isSearch) View.VISIBLE else View.GONE
         if (isHome) {
@@ -303,7 +313,7 @@ class MainActivity : AppCompatActivity() {
         val channels = filter.apply(unfiltered)
         channelAdapter.favorites = ChannelStore.favorites(this)
         channelAdapter.items = channels
-        binding.channels.selectedPosition = 0
+        channelsView.selection = 0
         binding.title.text = category
         binding.subtitle.text = if (filter.isActive) {
             getString(R.string.filtered_count, channels.size, unfiltered.size)
@@ -449,7 +459,7 @@ class MainActivity : AppCompatActivity() {
         binding.empty.text = getString(R.string.empty)
         homeAdapter.favorites = ChannelStore.favorites(this)
         homeAdapter.rows = Dashboard.rows(allChannels, homeAdapter.favorites, ChannelStore.recent(this))
-        binding.home.selectedPosition = 0
+        homeView.selection = 0
     }
 
     /** Rebuilds the rows after watching or favouriting, keeping the focused row when nothing moved. */
@@ -457,10 +467,10 @@ class MainActivity : AppCompatActivity() {
         val favorites = ChannelStore.favorites(this)
         val rows = Dashboard.rows(allChannels, favorites, ChannelStore.recent(this))
         if (rows == homeAdapter.rows && favorites == homeAdapter.favorites) return
-        val position = binding.home.selectedPosition
+        val position = homeView.selection
         homeAdapter.favorites = favorites
         homeAdapter.rows = rows
-        binding.home.selectedPosition = position.coerceIn(0, (rows.size - 1).coerceAtLeast(0))
+        homeView.selection = position.coerceIn(0, (rows.size - 1).coerceAtLeast(0))
         binding.title.text = getString(greeting())
     }
 
@@ -494,7 +504,7 @@ class MainActivity : AppCompatActivity() {
                 handler.removeCallbacks(runSearch)
                 runSearch.run()
                 hideKeyboard()
-                if (channelAdapter.itemCount > 0) binding.channels.requestFocus()
+                if (channelAdapter.itemCount > 0) channelsView.requestFocus()
                 true
             } else {
                 false
@@ -516,7 +526,7 @@ class MainActivity : AppCompatActivity() {
         val results = gridChannels()
         channelAdapter.favorites = ChannelStore.favorites(this)
         channelAdapter.items = results
-        binding.channels.selectedPosition = 0
+        channelsView.selection = 0
         binding.title.text = getString(R.string.search)
         binding.subtitle.text = if (query.isEmpty()) "" else getString(R.string.search_results, results.size, query)
         binding.empty.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
@@ -597,9 +607,9 @@ class MainActivity : AppCompatActivity() {
             refreshHome()
         } else {
             // Keep the cursor near where it was rather than jumping to the top.
-            val position = binding.channels.selectedPosition
+            val position = channelsView.selection
             showCategory(currentCategory, force = true)
-            binding.channels.selectedPosition = position.coerceIn(0, (channelAdapter.itemCount - 1).coerceAtLeast(0))
+            channelsView.selection = position.coerceIn(0, (channelAdapter.itemCount - 1).coerceAtLeast(0))
         }
     }
 

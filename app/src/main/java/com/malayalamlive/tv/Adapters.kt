@@ -3,6 +3,7 @@ package com.malayalamlive.tv
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.malayalamlive.tv.databinding.ItemChannelBinding
@@ -201,8 +202,14 @@ class HomeAdapter(
 
     class Holder(val binding: ItemHomeRowBinding) : RecyclerView.ViewHolder(binding.root)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        Holder(ItemHomeRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+        val holder = Holder(ItemHomeRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        holder.binding.rowList?.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            addItemDecoration(SpacingDecoration(context.dp(12)))
+        }
+        return holder
+    }
 
     override fun getItemCount() = rows.size
 
@@ -211,7 +218,8 @@ class HomeAdapter(
         val context = holder.binding.root.context
         holder.binding.title.text = row.title
         holder.binding.count.text = if (row.spotlight) "" else row.channels.size.toString()
-        holder.binding.row.adapter = if (row.spotlight) {
+        val list: RecyclerView = holder.binding.row ?: holder.binding.rowList!!
+        list.adapter = if (row.spotlight) {
             SpotlightAdapter(row, { onPlay(row, it) }, { row.channels.getOrNull(it)?.let(onFavorite) })
         } else {
             ChannelAdapter(
@@ -224,6 +232,6 @@ class HomeAdapter(
                 it.items = row.channels
             }
         }
-        holder.binding.row.selectedPosition = 0
+        list.selection = 0
     }
 }

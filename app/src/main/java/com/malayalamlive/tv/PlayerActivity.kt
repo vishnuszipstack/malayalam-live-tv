@@ -70,6 +70,10 @@ class PlayerActivity : AppCompatActivity() {
     /** Touch device: the banner shows buttons instead of remote-control hints. */
     private var touch = false
 
+    /** D-pad grid on TV, plain list on touch screens (see ListCompat.kt). */
+    private val listView: androidx.recyclerview.widget.RecyclerView
+        get() = if (touch) binding.channelListTouch else binding.channelList
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
@@ -87,7 +91,7 @@ class PlayerActivity : AppCompatActivity() {
         if (!isTv()) setUpTouch()
 
         binding.listTitle.text = ChannelStore.playingTitle
-        binding.channelList.adapter = listAdapter
+        listView.adapter = listAdapter
         listAdapter.items = channels
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -250,6 +254,9 @@ class PlayerActivity : AppCompatActivity() {
     @SuppressLint("ClickableViewAccessibility")
     private fun setUpTouch() {
         touch = true
+        binding.channelList.visibility = View.GONE
+        binding.channelListTouch.visibility = View.VISIBLE
+        binding.channelListTouch.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         binding.infoHints.visibility = View.GONE
         binding.touchControls.visibility = View.VISIBLE
         android.widget.Toast.makeText(this, R.string.touch_hint, android.widget.Toast.LENGTH_LONG).show()
@@ -293,8 +300,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showChannelList() {
         binding.listPanel.visibility = View.VISIBLE
-        binding.channelList.selectedPosition = index
-        binding.channelList.requestFocus()
+        listView.selection = index
+        listView.requestFocus()
         handler.removeCallbacks(hideList)
         handler.postDelayed(hideList, LIST_TIMEOUT_MS)
     }

@@ -176,5 +176,17 @@
             android:clipToPadding="false"
             android:paddingBottom="24dp"
             android:verticalSpacing="2dp" />
+
+        <!-- Touch screens: plain list (the D-pad grid above jumps when scrolled by touch) -->
+
+        <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/channelListTouch"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="16dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="24dp"
+                android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>
