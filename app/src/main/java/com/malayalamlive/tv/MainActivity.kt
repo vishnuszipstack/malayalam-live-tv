@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.core.widget.doAfterTextChanged
 import androidx.leanback.widget.OnChildViewHolderSelectedListener
 import androidx.lifecycle.lifecycleScope
@@ -71,6 +72,9 @@ class MainActivity : AppCompatActivity() {
         onPlay = { row, position -> playFrom(row.channels, position, row.title) },
         onFavorite = { showChannelOptions(it) },
     )
+
+    /** Only the phone layout has a drawer (as its root); TV and tablets show the sidebar permanently. */
+    private val drawerLayout: DrawerLayout? get() = binding.root as? DrawerLayout
 
     private val isHome get() = currentCategory == Dashboard.HOME
     private val isSearch get() = currentCategory == SEARCH
@@ -133,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         // Phones (the drawer layout) size the grid to the screen; TV and tablets use four columns.
-        val drawer = binding.drawer
+        val drawer = drawerLayout
         if (drawer != null) {
             binding.channels.setNumColumns(maxOf(2, resources.configuration.screenWidthDp / 180))
             binding.menuButton?.setOnClickListener { drawer.openDrawer(GravityCompat.START) }
@@ -149,7 +153,7 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val drawer = binding.drawer
+                val drawer = drawerLayout
                 if (drawer != null) {
                     // Phone: close the drawer, then return to Home, then leave.
                     when {
@@ -318,7 +322,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onSidebarClick(item: SidebarItem) {
-        binding.drawer?.closeDrawer(GravityCompat.START)
+        drawerLayout?.closeDrawer(GravityCompat.START)
         when (item.key) {
             ACTION_REFRESH -> load(forceRefresh = true)
             ACTION_SOURCES -> showSourcesDialog()
