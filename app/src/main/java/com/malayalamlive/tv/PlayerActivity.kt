@@ -1,10 +1,16 @@
 package com.malayalamlive.tv
 
+import android.annotation.SuppressLint
+import android.app.UiModeManager
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.GestureDetector
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.OptIn
@@ -61,6 +67,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private val channel get() = channels[index]
 
+    /** Touch device: the banner shows buttons instead of remote-control hints. */
+    private var touch = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
@@ -74,6 +83,8 @@ class PlayerActivity : AppCompatActivity() {
         }
         index = (savedInstanceState?.getInt(EXTRA_INDEX) ?: intent.getIntExtra(EXTRA_INDEX, 0))
             .coerceIn(0, channels.size - 1)
+
+        if (!isTv()) setUpTouch()
 
         binding.listTitle.text = ChannelStore.playingTitle
         binding.channelList.adapter = listAdapter
@@ -209,7 +220,7 @@ class PlayerActivity : AppCompatActivity() {
         }.joinToString("  ·  ")
         binding.infoDetail.text = detail.orEmpty()
         binding.infoDetail.visibility = if (detail == null) View.GONE else View.VISIBLE
-        binding.infoHints.text = getString(R.string.player_hints, resizeLabel(binding.playerView.resizeMode))
+        if (!touch) binding.infoHints.text = getString(R.string.player_hints, resizeLabel(binding.playerView.resizeMode))
         binding.infoLogo.load(channel.logo) {
             placeholder(R.drawable.ic_tv)
             error(R.drawable.ic_tv)
@@ -218,6 +229,66 @@ class PlayerActivity : AppCompatActivity() {
         binding.info.visibility = View.VISIBLE
         handler.removeCallbacks(hideInfo)
         if (!sticky) handler.postDelayed(hideInfo, INFO_TIMEOUT_MS)
+    }
+
+    private fun toggleFavorite() {
+        val added = ChannelStore.toggleFavorite(this, channel)
+        showInfo(getString(if (added) R.string.favorite_added else R.string.favorite_removed, channel.name))
+    }
+
+    private fun isTv(): Boolean {
+        val uiMode = (getSystemService(UI_MODE_SERVICE) as UiModeManager).currentModeType
+        return uiMode == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            packageManager.hasSystemFeature("amazon.hardware.fire_tv")
+    }
+
+    /**
+     * Phones: tap toggles the banner (which then shows buttons), swipe up/down changes channel,
+     * swipe right opens the channel list, double-tap changes the picture size.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setUpTouch() {
+        touch = true
+        binding.infoHints.visibility = View.GONE
+        binding.touchControls.visibility = View.VISIBLE
+        android.widget.Toast.makeText(this, R.string.touch_hint, android.widget.Toast.LENGTH_LONG).show()
+        binding.btnChannels.setOnClickListener { showChannelList() }
+        binding.btnPrevious.setOnClickListener { zap(-1) }
+        binding.btnNext.setOnClickListener { zap(1) }
+        binding.btnPicture.setOnClickListener { cycleResizeMode() }
+        binding.btnFavorite.setOnClickListener { toggleFavorite() }
+
+        val gestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                when {
+                    binding.listPanel.visibility == View.VISIBLE -> hideChannelList()
+                    binding.info.visibility == View.VISIBLE -> binding.info.visibility = View.GONE
+                    else -> showInfo()
+                }
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                cycleResizeMode()
+                return true
+            }
+
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                val dx = e2.x - (e1?.x ?: e2.x)
+                val dy = e2.y - (e1?.y ?: e2.y)
+                when {
+                    kotlin.math.abs(dy) > kotlin.math.abs(dx) && kotlin.math.abs(dy) > 120 -> zap(if (dy < 0) 1 else -1)
+                    dx > 120 -> showChannelList()
+                    dx < -120 && binding.listPanel.visibility == View.VISIBLE -> hideChannelList()
+                    else -> return false
+                }
+                return true
+            }
+        })
+        binding.playerView.setOnTouchListener { _, event -> gestures.onTouchEvent(event) }
     }
 
     private fun showChannelList() {
@@ -257,10 +328,7 @@ class PlayerActivity : AppCompatActivity() {
                 player?.let { it.playWhenReady = !it.playWhenReady }
                 showInfo()
             }
-            KeyEvent.KEYCODE_MENU -> {
-                val added = ChannelStore.toggleFavorite(this, channel)
-                showInfo(getString(if (added) R.string.favorite_added else R.string.favorite_removed, channel.name))
-            }
+            KeyEvent.KEYCODE_MENU -> toggleFavorite()
             KeyEvent.KEYCODE_INFO -> showInfo()
             else -> return super.onKeyDown(keyCode, event)
         }

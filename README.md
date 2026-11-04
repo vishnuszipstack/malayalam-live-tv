@@ -1,4 +1,4 @@
-# Malayalam Live TV — Fire TV app
+# Malayalam Live TV — Fire TV and Android app
 
 A live-TV player for Amazon Fire TV Stick (and any Android TV). It loads M3U/IPTV playlists,
 shows **Malayalam channels first**, and plays HLS/DASH streams full-screen with ExoPlayer.
@@ -25,6 +25,14 @@ shows **Malayalam channels first**, and plays HLS/DASH streams full-screen with 
 The app opens on *Home*: a Featured row of large cards (the channel you last watched, then the
 best-known Malayalam channels), followed by Continue watching, Favourites, Malayalam News,
 Malayalam Entertainment, Malayalam Devotional and the largest other categories.
+
+## On phones and tablets
+
+The same APK installs on Android phones (open the release link in the phone's browser). Narrow
+screens get a top bar with a ☰ button that slides out the categories, and a search button; the
+grid fits the screen width. In the player: tap for the channel banner and buttons (Channels,
+Previous, Next, Picture, Favourite), swipe up/down to change channel, swipe right for the
+channel list, double-tap to change the picture size. The player turns to landscape.
 
 ## Search
 

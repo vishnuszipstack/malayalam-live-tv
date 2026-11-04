@@ -84,4 +84,11 @@
     <string name="search_none">No channels match “%1$s”.</string>
     <string name="search_results">%1$d results for “%2$s”</string>
     <string name="voice_unavailable">Voice search isn\'t available here. Open the keyboard and hold the remote\'s microphone button to speak instead.</string>
+    <string name="categories">Categories</string>
+    <string name="touch_channels">☰ Channels</string>
+    <string name="touch_previous">▲ Previous</string>
+    <string name="touch_next">▼ Next</string>
+    <string name="touch_picture">⤢ Picture</string>
+    <string name="touch_favorite">★ Favourite</string>
+    <string name="touch_hint">Tap for controls · swipe up/down to change channel · double-tap for picture size</string>
 </resources>

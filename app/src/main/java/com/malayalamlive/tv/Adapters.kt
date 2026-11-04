@@ -217,7 +217,7 @@ class HomeAdapter(
             ChannelAdapter(
                 onClick = { onPlay(row, it) },
                 onLongClick = { row.channels.getOrNull(it)?.let(onFavorite) },
-                cardWidthPx = (210 * context.resources.displayMetrics.density).toInt(),
+                cardWidthPx = context.resources.getDimensionPixelSize(R.dimen.home_card_width),
                 showNumbers = false,
             ).also {
                 it.favorites = favorites

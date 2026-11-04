@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Phones; values-w600dp holds the TV / tablet sizes. -->
+    <dimen name="home_card_width">150dp</dimen>
+    <dimen name="spotlight_width">260dp</dimen>
+    <dimen name="spotlight_height">146dp</dimen>
+    <dimen name="spotlight_logo_width">140dp</dimen>
+    <dimen name="spotlight_logo_height">70dp</dimen>
+</resources>

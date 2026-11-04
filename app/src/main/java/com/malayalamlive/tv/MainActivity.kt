@@ -22,6 +22,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.leanback.widget.OnChildViewHolderSelectedListener
 import androidx.lifecycle.lifecycleScope
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         const val CATEGORY_DELAY_MS = 180L
         const val SEARCH = "Search"
         const val SEARCH_DELAY_MS = 250L
+        const val STATE_CATEGORY = "category"
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -130,7 +132,16 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        binding.channels.setNumColumns(4)
+        // Phones (the drawer layout) size the grid to the screen; TV and tablets use four columns.
+        val drawer = binding.drawer
+        if (drawer != null) {
+            binding.channels.setNumColumns(maxOf(2, resources.configuration.screenWidthDp / 180))
+            binding.menuButton?.setOnClickListener { drawer.openDrawer(GravityCompat.START) }
+            binding.searchButton?.setOnClickListener { openSearch() }
+        } else {
+            binding.channels.setNumColumns(4)
+        }
+        savedInstanceState?.getString(STATE_CATEGORY)?.let { currentCategory = it }
         binding.channels.adapter = channelAdapter
         binding.home.adapter = homeAdapter
 
@@ -138,6 +149,23 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                val drawer = binding.drawer
+                if (drawer != null) {
+                    // Phone: close the drawer, then return to Home, then leave.
+                    when {
+                        drawer.isDrawerOpen(GravityCompat.START) -> drawer.closeDrawer(GravityCompat.START)
+                        !isHome -> {
+                            showCategory(Dashboard.HOME)
+                            binding.home.scrollToPosition(0)
+                        }
+                        else -> {
+                            isEnabled = false
+                            onBackPressedDispatcher.onBackPressed()
+                            isEnabled = true
+                        }
+                    }
+                    return
+                }
                 // Back from the channel grid goes to the categories first, then exits.
                 if (binding.channels.hasFocus() || binding.home.hasFocus() || binding.filterBar.hasFocus() ||
                     binding.searchBar.hasFocus()
@@ -153,6 +181,11 @@ class MainActivity : AppCompatActivity() {
 
         load(forceRefresh = false)
         checkForUpdate(userAsked = false)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_CATEGORY, currentCategory)
     }
 
     override fun onDestroy() {
@@ -285,6 +318,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onSidebarClick(item: SidebarItem) {
+        binding.drawer?.closeDrawer(GravityCompat.START)
         when (item.key) {
             ACTION_REFRESH -> load(forceRefresh = true)
             ACTION_SOURCES -> showSourcesDialog()
