@@ -21,7 +21,7 @@ class Updater(private val context: Context) {
 
     companion object {
         private const val LATEST_RELEASE =
-            "https://api.github.com/repos/vishnuszipstack/malayalam-live-tv/releases/latest"
+            "https://api.github.com/repos/vishnusathyanesan/malayalam-live-tv/releases/latest"
         private const val APK_MIME = "application/vnd.android.package-archive"
     }
 
